@@ -202,3 +202,4 @@ tags
 tests/async_queries
 tests/bug25714
 tests/mysql_client_test
+debug/
