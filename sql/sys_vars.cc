@@ -4760,3 +4760,10 @@ static Sys_var_mybool Sys_pseudo_slave_mode(
        SESSION_ONLY(pseudo_slave_mode), NO_CMD_LINE, DEFAULT(FALSE),
        NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(check_pseudo_slave_mode));
 
+/* SQL Check variables */
+static Sys_var_mybool Sys_sql_check(
+       "sql_check",
+       "SET sql_check= 0,1 are commands that trigger sql check"
+       "While zero value indeed disables sql check and act as normal,"
+       "While one value indeed enable sql check",
+       SESSION_ONLY(sql_check), NO_CMD_LINE, DEFAULT(FALSE));

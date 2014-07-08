@@ -1,0 +1,6 @@
+# This test is to check variables sql_check
+
+connect (con1,localhost,root,,"");
+show variables like 'sql_check';
+set sql_check=1;
+show variables like 'sql_check';

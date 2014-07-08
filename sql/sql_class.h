@@ -642,6 +642,9 @@ typedef struct system_variables
 
   my_bool pseudo_slave_mode;
 
+  /* sql check */
+  my_bool sql_check;
+
 } SV;
 
 /**
