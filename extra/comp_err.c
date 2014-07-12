@@ -33,7 +33,7 @@
 #include <assert.h>
 #include <my_dir.h>
 
-#define MAX_ROWS  2000
+#define MAX_ROWS  2500
 #define HEADER_LENGTH 32                /* Length of header in errmsg.sys */
 #define ERRMSG_VERSION 3                /* Version number of errmsg.sys */
 #define DEFAULT_CHARSET_DIR "../sql/share/charsets"

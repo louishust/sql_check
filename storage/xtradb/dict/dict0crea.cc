@@ -1376,7 +1376,7 @@ dict_create_or_check_foreign_constraint_tables(void)
 		row_drop_table_for_mysql("SYS_FOREIGN_COLS", trx, TRUE);
 	}
 
-	ib_logf(IB_LOG_LEVEL_WARN,
+	ib_logf(IB_LOG_LEVEL_INFO,
 		"Creating foreign key constraint system tables.");
 
 	/* NOTE: in dict_load_foreigns we use the fact that

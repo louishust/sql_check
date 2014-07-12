@@ -2,18 +2,18 @@
 if [-d debug]
 then
   cd debug
-  make && make install
+  make -j8 && make install
 else
   mkdir debug
   cd debug
 
-  cmake -DWITH_DEBUG=1 -DCMAKE_INSTALL_PREFIX=./mysql  -DMYSQL_DATADIR=./mysql/data \
+  cmake -DCMAKE_BUILD_TYPE=DEBUG  -DPLUGIN_XTRADB=STATIC -DCMAKE_INSTALL_PREFIX=./mysql  -DMYSQL_DATADIR=./mysql/data \
     -DWITH_SSL=yes -DENABLED_LOCAL_INFILE=1 -DWITH_READLINE=1 \
     -DMY_MAINTAINER_CXX_WARNINGS="-Wall -Wextra -Wunused -Wwrite-strings -Wno-strict-aliasing  -Wno-unused-parameter -Woverloaded-virtual" \
     -DMY_MAINTAINER_C_WARNINGS="-Wall -Wextra -Wunused -Wwrite-strings -Wno-strict-aliasing -Wdeclaration-after-statement" \
     ..
 
-  make && make install
+  make -j8 && make install
 
   # create default database
   cd mysql/scripts

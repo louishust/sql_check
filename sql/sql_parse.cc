@@ -2181,6 +2181,372 @@ err:
 }
 
 
+bool mysql_check_create_table(THD *thd)
+{
+  LEX  *lex= thd->lex;
+  SELECT_LEX *select_lex= &lex->select_lex;
+  TABLE_LIST *first_table= select_lex->table_list.first;
+  TABLE_LIST *all_tables;
+  TABLE_LIST *create_table= first_table;
+  all_tables= lex->query_tables;
+
+  HA_CREATE_INFO create_info(lex->create_info);
+  /* 1. can not be create select */
+  if (select_lex->item_list.elements)  // With select
+  {
+    my_error(ER_SQL_CHECK_CREATE_TABLE_WITH_SELECT, MYF(0),
+        create_table->table_name);
+    return FALSE;
+  }
+
+  /* 2. can not be temporary table */
+  if (create_info.options & HA_LEX_CREATE_TMP_TABLE)
+  {
+    my_error(ER_SQL_CHECK_CREATE_TABLE_WITH_TEMP, MYF(0),
+        create_table->table_name);
+    return FALSE;
+  }
+
+  /* 3. table engine must be innodb */
+  if (!(create_info.used_fields & HA_CREATE_USED_ENGINE) ||
+      (create_info.db_type->db_type != DB_TYPE_INNODB))
+  {
+    my_error(ER_SQL_CHECK_CREATE_TABLE_WITHOUT_INNODB, MYF(0),
+        create_table->table_name);
+    return FALSE;
+  }
+
+  /* 4. check table name lower case */
+  {
+    char *p = create_table->table_name;
+    while (p)
+    {
+      if ((*p >= 'a' && *p <= 'z') || (*p == '_'))
+      {
+        p++;
+        continue;
+      }
+      else
+      {
+        my_error(ER_SQL_CHECK_CREATE_TABLE_INVALID_NAME, MYF(0),
+            create_table->table_name);
+        return FALSE;
+      }
+    }
+  }
+
+  return TRUE;
+}
+
+
+/**
+  Check command saved in thd and lex->sql_command.
+
+  @param thd                       Thread handle
+
+  @todo
+    - Invalidate the table in the query cache if something changed
+    after unlocking when changes become visible.
+    TODO: this is workaround. right way will be move invalidating in
+    the unlock procedure.
+    - TODO: use check_change_password()
+
+  @retval
+    FALSE       OK
+  @retval
+    TRUE        Error
+*/
+
+int
+mysql_check_command(THD *thd)
+{
+  int res= FALSE;
+  int  up_result= 0;
+  LEX  *lex= thd->lex;
+  /* first SELECT_LEX (have special meaning for many of non-SELECTcommands) */
+  SELECT_LEX *select_lex= &lex->select_lex;
+  /* first table of first SELECT_LEX */
+  TABLE_LIST *first_table= select_lex->table_list.first;
+  /* list of all tables in query */
+  TABLE_LIST *all_tables;
+  /* most outer SELECT_LEX_UNIT of query */
+  SELECT_LEX_UNIT *unit= &lex->unit;
+#ifdef HAVE_REPLICATION
+  /* have table map for update for multi-update statement (BUG#37051) */
+  bool have_table_map_for_update= FALSE;
+  /* */
+  Rpl_filter *rpl_filter;
+#endif
+  DBUG_ENTER("mysql_check_command");
+
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+  thd->work_part_info= 0;
+#endif
+
+  lex->first_lists_tables_same();
+  /* should be assigned after making first tables same */
+  all_tables= lex->query_tables;
+  /* set context for commands which do not use setup_tables */
+  select_lex->
+    context.resolve_in_table_list_only(select_lex->
+                                       table_list.first);
+
+  /*
+     Reset warning count for each query that uses tables
+     A better approach would be to reset this for any commands
+     that is not a SHOW command or a select that only access local
+     variables, but for now this is probably good enough.
+     */
+  if ((sql_command_flags[lex->sql_command] & CF_DIAGNOSTIC_STMT) != 0)
+    thd->get_stmt_da()->set_warning_info_read_only(TRUE);
+  else
+  {
+    thd->get_stmt_da()->set_warning_info_read_only(FALSE);
+    if (all_tables)
+      thd->get_stmt_da()->opt_clear_warning_info(thd->query_id);
+  }
+
+  /*
+     When option readonly is set deny operations which change non-temporary
+     tables. Except for the replication thread and the 'super' users.
+     */
+  if (deny_updates_if_read_only_option(thd, all_tables))
+  {
+    my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "--read-only");
+    DBUG_RETURN(-1);
+  }
+
+  status_var_increment(thd->status_var.com_stat[lex->sql_command]);
+  thd->progress.report_to_client= MY_TEST(sql_command_flags[lex->sql_command] &
+                                          CF_REPORT_PROGRESS);
+
+  DBUG_ASSERT(thd->transaction.stmt.modified_non_trans_table == FALSE);
+
+  /* store old value of binlog format */
+  enum_binlog_format orig_binlog_format,orig_current_stmt_binlog_format;
+
+  thd->get_binlog_format(&orig_binlog_format,
+                         &orig_current_stmt_binlog_format);
+
+  /*
+    Force statement logging for DDL commands to allow us to update
+    privilege, system or statistic tables directly without the updates
+    getting logged.
+  */
+  if (!(sql_command_flags[lex->sql_command] &
+        (CF_CAN_GENERATE_ROW_EVENTS | CF_FORCE_ORIGINAL_BINLOG_FORMAT |
+         CF_STATUS_COMMAND)))
+    thd->set_binlog_format_stmt();
+
+  /*
+    End a active transaction so that this command will have it's
+    own transaction and will also sync the binary log. If a DDL is
+    not run in it's own transaction it may simply never appear on
+    the slave in case the outside transaction rolls back.
+  */
+  if (stmt_causes_implicit_commit(thd, CF_IMPLICT_COMMIT_BEGIN))
+  {
+    /*
+      Note that this should never happen inside of stored functions
+      or triggers as all such statements prohibited there.
+    */
+    DBUG_ASSERT(! thd->in_sub_stmt);
+    /* Statement transaction still should not be started. */
+    DBUG_ASSERT(thd->transaction.stmt.is_empty());
+    if (!(thd->variables.option_bits & OPTION_GTID_BEGIN))
+    {
+      /* Commit the normal transaction if one is active. */
+      if (trans_commit_implicit(thd))
+        goto error;
+      /* Release metadata locks acquired in this transaction. */
+      thd->mdl_context.release_transactional_locks();
+    }
+  }
+
+#ifndef DBUG_OFF
+  if (lex->sql_command != SQLCOM_SET_OPTION)
+    DEBUG_SYNC(thd,"before_execute_sql_command");
+#endif
+
+  /*
+    Check if we are in a read-only transaction and we're trying to
+    execute a statement which should always be disallowed in such cases.
+
+    Note that this check is done after any implicit commits.
+  */
+  if (thd->tx_read_only &&
+      (sql_command_flags[lex->sql_command] & CF_DISALLOW_IN_RO_TRANS))
+  {
+    my_error(ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION, MYF(0));
+    goto error;
+  }
+
+  /*
+    Close tables open by HANDLERs before executing DDL statement
+    which is going to affect those tables.
+
+    This should happen before temporary tables are pre-opened as
+    otherwise we will get errors about attempt to re-open tables
+    if table to be changed is open through HANDLER.
+
+    Note that even although this is done before any privilege
+    checks there is no security problem here as closing open
+    HANDLER doesn't require any privileges anyway.
+  */
+  if (sql_command_flags[lex->sql_command] & CF_HA_CLOSE)
+    mysql_ha_rm_tables(thd, all_tables);
+
+  /*
+    Pre-open temporary tables to simplify privilege checking
+    for statements which need this.
+  */
+  if (sql_command_flags[lex->sql_command] & CF_PREOPEN_TMP_TABLES)
+  {
+    if (open_temporary_tables(thd, all_tables))
+      goto error;
+  }
+
+  switch (lex->sql_command) {
+
+  case SQLCOM_CREATE_TABLE:
+  {
+    if (mysql_check_create_table(thd) == FALSE)
+      break;
+  }
+  case SQLCOM_SET_OPTION:
+  {
+    List<set_var_base> *lex_var_list= &lex->var_list;
+
+    if (!(res= sql_set_variables(thd, lex_var_list)))
+    {
+      my_ok(thd);
+    }
+    else
+    {
+      /*
+        We encountered some sort of error, but no message was sent.
+        Send something semi-generic here since we don't know which
+        assignment in the list caused the error.
+      */
+      if (!thd->is_error())
+        my_error(ER_WRONG_ARGUMENTS,MYF(0),"SET");
+      goto error;
+    }
+
+    break;
+  }
+  default:
+  {
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "embedded server");
+    break;
+  }
+  } //switch
+  THD_STAGE_INFO(thd, stage_query_end);
+  thd->update_stats();
+
+  goto finish;
+
+error:
+  res= TRUE;
+
+finish:
+
+  DBUG_ASSERT(!thd->in_active_multi_stmt_transaction() ||
+      thd->in_multi_stmt_transaction_mode());
+
+  lex->unit.cleanup();
+
+  if (! thd->in_sub_stmt)
+  {
+    if (thd->killed != NOT_KILLED)
+    {
+      /* report error issued during command execution */
+      if (thd->killed_errno())
+      {
+        /* If we already sent 'ok', we can ignore any kill query statements */
+        if (! thd->get_stmt_da()->is_set())
+          thd->send_kill_message();
+      }
+      if (thd->killed < KILL_CONNECTION)
+      {
+        thd->reset_killed();
+        thd->mysys_var->abort= 0;
+      }
+    }
+    if (thd->is_error() || (thd->variables.option_bits & OPTION_MASTER_SQL_ERROR))
+      trans_rollback_stmt(thd);
+    else
+    {
+      /* If commit fails, we should be able to reset the OK status. */
+      thd->get_stmt_da()->set_overwrite_status(true);
+      trans_commit_stmt(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+    }
+#ifdef WITH_ARIA_STORAGE_ENGINE
+    ha_maria::implicit_commit(thd, FALSE);
+#endif
+  }
+
+  /* Free tables */
+  close_thread_tables(thd);
+
+#ifndef DBUG_OFF
+  if (lex->sql_command != SQLCOM_SET_OPTION && ! thd->in_sub_stmt)
+    DEBUG_SYNC(thd, "execute_command_after_close_tables");
+#endif
+  if (!(sql_command_flags[lex->sql_command] &
+        (CF_CAN_GENERATE_ROW_EVENTS | CF_FORCE_ORIGINAL_BINLOG_FORMAT |
+         CF_STATUS_COMMAND)))
+    thd->set_binlog_format(orig_binlog_format,
+                           orig_current_stmt_binlog_format);
+
+  if (! thd->in_sub_stmt && thd->transaction_rollback_request)
+  {
+    /*
+      We are not in sub-statement and transaction rollback was requested by
+      one of storage engines (e.g. due to deadlock). Rollback transaction in
+      all storage engines including binary log.
+    */
+    trans_rollback_implicit(thd);
+    thd->mdl_context.release_transactional_locks();
+  }
+  else if (stmt_causes_implicit_commit(thd, CF_IMPLICIT_COMMIT_END))
+  {
+    /* No transaction control allowed in sub-statements. */
+    DBUG_ASSERT(! thd->in_sub_stmt);
+    if (!(thd->variables.option_bits & OPTION_GTID_BEGIN))
+    {
+      /* If commit fails, we should be able to reset the OK status. */
+      thd->get_stmt_da()->set_overwrite_status(true);
+      /* Commit the normal transaction if one is active. */
+      trans_commit_implicit(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+      thd->mdl_context.release_transactional_locks();
+    }
+  }
+  else if (! thd->in_sub_stmt && ! thd->in_multi_stmt_transaction_mode())
+  {
+    /*
+      - If inside a multi-statement transaction,
+      defer the release of metadata locks until the current
+      transaction is either committed or rolled back. This prevents
+      other statements from modifying the table for the entire
+      duration of this transaction.  This provides commit ordering
+      and guarantees serializability across multiple transactions.
+      - If in autocommit mode, or outside a transactional context,
+      automatically release metadata locks of the current statement.
+    */
+    thd->mdl_context.release_transactional_locks();
+  }
+  else if (! thd->in_sub_stmt)
+  {
+    thd->mdl_context.release_statement_locks();
+  }
+
+
+  DBUG_RETURN(res || thd->is_error());
+}
+
 /**
   Execute command saved in thd and lex->sql_command.
 
@@ -6458,7 +6824,10 @@ void mysql_parse(THD *thd, char *rawbuf, uint length,
                                  (char *) thd->security_ctx->host_or_ip,
                                  0);
 
-          error= mysql_execute_command(thd);
+          if (!thd->variables.sql_check)
+            error= mysql_execute_command(thd);
+          else
+            error= mysql_check_command(thd);
           MYSQL_QUERY_EXEC_DONE(error);
 	}
       }

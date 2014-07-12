@@ -1,0 +1,14 @@
+# This test is to check sql syntax
+
+connect (con1,localhost,root,,"");
+show variables like 'sql_check';
+set sql_check=1;
+--error 2000
+CREATE TABLE t1 SELECT * from t2;
+--error 2001
+CREATE TEMPORARY TABLE t1 (c1 int);
+--error 2003
+CREATE TABLE t1 (c1 int);
+--error 2002
+CREATE TABLE t1(c1 int) engine=InnoDB;
+set sql_check=0;

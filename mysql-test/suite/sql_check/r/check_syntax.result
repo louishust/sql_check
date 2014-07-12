@@ -1,0 +1,9 @@
+show variables like 'sql_check';
+Variable_name	Value
+sql_check	OFF
+set sql_check=1;
+SELECTT FROM A;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'SELECTT FROM A' at line 1
+SELECT FROM A;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'FROM A' at line 1
+set sql_check=0;

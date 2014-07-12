@@ -7110,3 +7110,25 @@ ER_IT_IS_A_VIEW 42S02
         eng "'%-.192s' is a view"
 ER_SLAVE_SKIP_NOT_IN_GTID
 	eng "When using GTID, @@sql_slave_skip_counter can not be used. Instead, setting @@gtid_slave_pos explicitly can be used to skip to after a given GTID position."
+
+#
+# SQL Check error messages section starts here
+#
+
+# The following is here to allow us to detect if there was missing
+# error messages in the errmsg.sys file
+
+ER_LAST_MARIADB_ERROR_MESSAGE
+   eng ""
+
+# SQL Check error numbers starts from 2000
+start-error-number 2000
+
+ER_SQL_CHECK_CREATE_TABLE_WITH_SELECT
+	eng "Cannot create table '%s' with select."
+ER_SQL_CHECK_CREATE_TABLE_WITH_TEMP
+	eng "Cannot create temporary table '%s'."
+ER_SQL_CHECK_CREATE_TABLE_INVALID_NAME
+	eng "Name of table '%s' must be [_a-z]."
+ER_SQL_CHECK_CREATE_TABLE_WITHOUT_INNODB
+	eng "Create table '%s' must specify engine as InnoDB."

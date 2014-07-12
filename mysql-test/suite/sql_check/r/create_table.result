@@ -1,0 +1,13 @@
+show variables like 'sql_check';
+Variable_name	Value
+sql_check	OFF
+set sql_check=1;
+CREATE TABLE t1 SELECT * from t2;
+ERROR HY000: Cannot create table 't1' with select.
+CREATE TEMPORARY TABLE t1 (c1 int);
+ERROR HY000: Cannot create temporary table 't1'.
+CREATE TABLE t1 (c1 int);
+ERROR HY000: Create table 't1' must specify engine as InnoDB.
+CREATE TABLE t1(c1 int) engine=InnoDB;
+ERROR HY000: Name of table 't1' must be [_a-z].
+set sql_check=0;

@@ -1,0 +1,10 @@
+# This test is to check sql syntax
+
+connect (con1,localhost,root,,"");
+show variables like 'sql_check';
+set sql_check=1;
+--error 1064
+SELECTT FROM A;
+--error 1064
+SELECT FROM A;
+set sql_check=0;

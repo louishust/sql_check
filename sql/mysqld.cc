@@ -7048,7 +7048,7 @@ struct my_option my_long_options[]=
 #ifndef DISABLE_GRANT_OPTIONS
   {"skip-grant-tables", 0,
    "Start without grant tables. This gives all users FULL ACCESS to all tables.",
-   &opt_noacl, &opt_noacl, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0,
+   &opt_noacl, &opt_noacl, 0, GET_BOOL, NO_ARG, 1, 0, 0, 0, 0,
    0},
 #endif
   {"skip-host-cache", OPT_SKIP_HOST_CACHE, "Don't cache host names.", 0, 0, 0,

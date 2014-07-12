@@ -751,7 +751,7 @@ create_log_files_rename(
 
 	fil_open_log_and_system_tablespace_files();
 
-	ib_logf(IB_LOG_LEVEL_WARN, "New log files created, LSN=" LSN_PF, lsn);
+	ib_logf(IB_LOG_LEVEL_INFO, "New log files created, LSN=" LSN_PF, lsn);
 }
 
 /*********************************************************************//**
