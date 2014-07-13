@@ -8,3 +8,10 @@ SELECTT FROM A;
 --error 1064
 SELECT FROM A;
 set sql_check=0;
+
+set sql_check=1;
+# test multi statements
+delimiter |;
+--error 1064
+SELECTT FROM A;SELECT FROM A;|
+delimiter ;|
