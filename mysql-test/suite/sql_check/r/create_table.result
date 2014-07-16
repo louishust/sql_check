@@ -1,13 +1,37 @@
-show variables like 'sql_check';
+SHOW VARIABLES LIKE 'sql_check';
 Variable_name	Value
 sql_check	OFF
 set sql_check=1;
-CREATE TABLE t1 SELECT * from t2;
+CREATE TABLE t1 SELECT * FROM t2;
 ERROR HY000: Cannot create table 't1' with select.
-CREATE TEMPORARY TABLE t1 (c1 int);
+CREATE TEMPORARY TABLE t1 (c1 INT);
 ERROR HY000: Cannot create temporary table 't1'.
-CREATE TABLE t1 (c1 int);
+CREATE TABLE t1 (c1 INT);
 ERROR HY000: Create table 't1' must specify engine as InnoDB.
-CREATE TABLE t1(c1 int) engine=InnoDB;
+CREATE TABLE t1(c1 INT) ENGINE=INNODB;
 ERROR HY000: Name of table 't1' must be [_a-z].
-set sql_check=0;
+CREATE TABLE TT(c1 INT) ENGINE=INNODB;
+ERROR HY000: Name of table 'TT' must be [_a-z].
+CREATE TABLE ttttttttttttttttttttttttttttttttttt(c1 INT) ENGINE=INNODB;
+ERROR HY000: Create table 'ttttttttttttttttttttttttttttttttttt' name should be no more than 32.
+CREATE TABLE tt(c1 INT) ENGINE=INNODB DEFAULT CHARSET=LATIN1;
+ERROR HY000: Create table 'tt' charset must be utf8 or utf8mb4.
+CREATE TABLE tt(ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc INT) ENGINE = INNODB DEFAULT CHARSET=UTF8;
+ERROR 42000: Identifier name 'ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc' is too long
+CREATE TABLE tt(cc INT) ENGINE=INNODB DEFAULT CHARSET=UTF8;
+ERROR HY000: Table 'tt's column 'cc' should be NOT NULL.
+CREATE TABLE tt(cc varchar(20) CHARSET LATIN1 NOT NULL) ENGINE=INNODB DEFAULT CHARSET=UTF8;
+ERROR HY000: Table 'tt's column 'cc' charset should be utf8 or utf8mb4.
+CREATE TABLE tt(cc INT NOT NULL) ENGINE=INNODB DEFAULT CHARSET=UTF8;
+ERROR HY000: Table 'tt's column 'cc' has no comment.
+CREATE TABLE tt(CC INT NOT NULL COMMENT 'cc') ENGINE=INNODB DEFAULT CHARSET=UTF8;
+ERROR HY000: Table 'tt's column 'CC' name must be [_a-z].
+CREATE TABLE tt(c_z INT NOT NULL COMMENT 'cc') ENGINE=INNODB DEFAULT CHARSET=UTF8;
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', c1 VARCHAR(20) NOT NULL COMMENT 'c2')
+ENGINE=INNODB DEFAULT CHARSET=UTF8;
+ERROR HY000: Table 'tt' has more than one column 'c1'.
+CREATE TABLE tt(c1 ENUM('MALE','FEMALE') NOT NULL COMMENT 'c1') ENGINE=INNODB DEFAULT CHARSET=UTF8;
+ERROR HY000: Table 'tt's column 'c1' type can not be ENUM or SET.
+CREATE TABLE tt(c1 SET('MALE','FEMALE') NOT NULL COMMENT 'c1') ENGINE=INNODB DEFAULT CHARSET=UTF8;
+ERROR HY000: Table 'tt's column 'c1' type can not be ENUM or SET.
+SET SQL_CHECK=0;

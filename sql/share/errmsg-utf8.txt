@@ -7132,3 +7132,25 @@ ER_SQL_CHECK_CREATE_TABLE_INVALID_NAME
 	eng "Name of table '%s' must be [_a-z]."
 ER_SQL_CHECK_CREATE_TABLE_WITHOUT_INNODB
 	eng "Create table '%s' must specify engine as InnoDB."
+ER_SQL_CHECK_CREATE_TABLE_NAME_TOO_LONG
+	eng "Create table '%s' name should be no more than 32."
+ER_SQL_CHECK_CREATE_TABLE_WRONG_CHARSET
+	eng "Create table '%s' charset must be utf8 or utf8mb4."
+ER_SQL_CHECK_CREATE_PARTITION_TABLE
+	eng "Create table '%s' can't be partition."
+ER_SQL_CHECK_CREATE_TABLE_COLUMN_TOO_LONG
+	eng "Table '%s's column '%s' should be no more than 64."
+ER_SQL_CHECK_CREATE_TABLE_COLUMN_NULLABLE
+	eng "Table '%s's column '%s' should be NOT NULL."
+ER_SQL_CHECK_CREATE_TABLE_COLUMN_CHARSET
+	eng "Table '%s's column '%s' charset should be utf8 or utf8mb4."
+ER_SQL_CHECK_CREATE_TABLE_COLUMN_COMMENT
+	eng "Table '%s's column '%s' has no comment."
+ER_SQL_CHECK_CREATE_TABLE_COLUMN_INVALID_NAME
+	eng "Table '%s's column '%s' name must be [_a-z]."
+ER_SQL_CHECK_CREATE_TABLE_COLUMN_INVALID_TYPE
+	eng "Table '%s's column '%s' type can not be ENUM or SET."
+ER_SQL_CHECK_CREATE_TABLE_COLUMN_DUPLICATE
+	eng "Table '%s' has more than one column '%s'."
+ER_SQL_CHECK_NOT_SUPPORT
+	eng "This version of SQL CHECK doesn't yet support this type statement."

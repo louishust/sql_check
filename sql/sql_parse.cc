@@ -2180,15 +2180,127 @@ err:
   return TRUE;
 }
 
+/**
+  Check table columns
 
+  @param thd    Thread handle
+
+  @retval
+    FALSE       OK
+  @retval
+    TRUE        Error
+*/
+bool mysql_check_create_table_columns(TABLE_LIST* create_table,
+                                      Alter_info* alter_info)
+{
+  Create_field	*sql_field, *dup_field;
+  List_iterator<Create_field> it(alter_info->create_list);
+  List_iterator<Create_field> it2(alter_info->create_list);
+  int		field_no;
+  for (field_no=0; (sql_field=it++) ; field_no++)
+  {
+    /* 1. check columns name length, should be <= 64 */
+    if (sql_field->char_length > 64)
+    {
+      my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_TOO_LONG, MYF(0),
+               create_table->table_name, sql_field->field_name);
+      return TRUE;
+    }
+
+    /* 2. NULL CHECK */
+    if (!(sql_field->flags & NOT_NULL_FLAG))
+    {
+      my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_NULLABLE, MYF(0),
+               create_table->table_name, sql_field->field_name);
+      return TRUE;
+    }
+
+    /* 3. CHARSET CHECK */
+    if (sql_field->charset &&
+        sql_field->charset != &my_charset_utf8_general_ci &&
+        sql_field->charset != &my_charset_utf8mb4_general_ci)
+    {
+      my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_CHARSET, MYF(0),
+               create_table->table_name, sql_field->field_name);
+      return TRUE;
+    }
+
+    /* 4. COMMENT CHECK */
+    if (sql_field->comment.str == NULL)
+    {
+      my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_COMMENT, MYF(0),
+               create_table->table_name, sql_field->field_name);
+      return TRUE;
+    }
+
+    /* 5. COLUMN NAME CHECK */
+    {
+      const char *p= sql_field->field_name;
+      while (*p)
+      {
+        if ((*p >= 'a' && *p <= 'z') || (*p == '_') ||
+            (*p >='0' && *p <= '9'))
+        {
+          p++;
+          continue;
+        }
+        else
+        {
+          my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_INVALID_NAME, MYF(0),
+                   create_table->table_name, sql_field->field_name);
+          return TRUE;
+        }
+      }
+    }
+
+    /* 6. TYPE CHECK */
+    if (sql_field->sql_type == MYSQL_TYPE_ENUM ||
+        sql_field->sql_type == MYSQL_TYPE_SET)
+    {
+      my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_INVALID_TYPE, MYF(0),
+               create_table->table_name, sql_field->field_name);
+      return TRUE;
+    }
+
+    //TODO check duplicate columns
+    while ((dup_field= it2++))
+    {
+      if (dup_field == sql_field)
+        continue;
+      if (my_strcasecmp(system_charset_info,
+                        sql_field->field_name,
+                        dup_field->field_name) == 0)
+      {
+        my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_DUPLICATE, MYF(0),
+            create_table->table_name, sql_field->field_name);
+        return TRUE;
+      }
+    }
+    it2.rewind();
+  }
+
+
+  //TODO disable foreign key
+  //
+  return FALSE;
+}
+
+/**
+  Check  create table
+
+  @param thd    Thread handle
+
+  @retval
+    FALSE       OK
+  @retval
+    TRUE        Error
+*/
 bool mysql_check_create_table(THD *thd)
 {
   LEX  *lex= thd->lex;
   SELECT_LEX *select_lex= &lex->select_lex;
   TABLE_LIST *first_table= select_lex->table_list.first;
-  TABLE_LIST *all_tables;
   TABLE_LIST *create_table= first_table;
-  all_tables= lex->query_tables;
 
   HA_CREATE_INFO create_info(lex->create_info);
   /* 1. can not be create select */
@@ -2196,7 +2308,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WITH_SELECT, MYF(0),
         create_table->table_name);
-    return FALSE;
+    return TRUE;
   }
 
   /* 2. can not be temporary table */
@@ -2204,7 +2316,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WITH_TEMP, MYF(0),
         create_table->table_name);
-    return FALSE;
+    return TRUE;
   }
 
   /* 3. table engine must be innodb */
@@ -2213,13 +2325,13 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WITHOUT_INNODB, MYF(0),
         create_table->table_name);
-    return FALSE;
+    return TRUE;
   }
 
   /* 4. check table name lower case */
   {
-    char *p = create_table->table_name;
-    while (p)
+    char *p= create_table->table_name;
+    while (*p)
     {
       if ((*p >= 'a' && *p <= 'z') || (*p == '_'))
       {
@@ -2230,12 +2342,45 @@ bool mysql_check_create_table(THD *thd)
       {
         my_error(ER_SQL_CHECK_CREATE_TABLE_INVALID_NAME, MYF(0),
             create_table->table_name);
-        return FALSE;
+        return TRUE;
       }
     }
   }
 
-  return TRUE;
+  /* 5. table name should be less than 32 bytes */
+  if (strlen(create_table->table_name) > 32)
+  {
+    my_error(ER_SQL_CHECK_CREATE_TABLE_NAME_TOO_LONG, MYF(0),
+        create_table->table_name);
+    return TRUE;
+  }
+
+  /* 6. table default charset should be UTF8 or UTF8mb4 */
+  if (! (create_info.used_fields & HA_CREATE_USED_DEFAULT_CHARSET) ||
+      (create_info.default_table_charset != &my_charset_utf8_general_ci &&
+      create_info.default_table_charset != &my_charset_utf8mb4_general_ci))
+  {
+    my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_CHARSET, MYF(0),
+        create_table->table_name);
+    return TRUE;
+  }
+
+  /* 7. Can not be partition table */
+  if (lex->part_info != NULL)
+  {
+    my_error(ER_SQL_CHECK_CREATE_PARTITION_TABLE, MYF(0),
+        create_table->table_name);
+    return TRUE;
+  }
+
+  //TODO TABLE COMMENT
+
+  /* 8. check columns */
+  Alter_info alter_info(lex->alter_info, thd->mem_root);
+  if (mysql_check_create_table_columns(create_table, &alter_info))
+    return TRUE;
+
+  return FALSE;
 }
 
 
@@ -2261,22 +2406,11 @@ int
 mysql_check_command(THD *thd)
 {
   int res= FALSE;
-  int  up_result= 0;
   LEX  *lex= thd->lex;
   /* first SELECT_LEX (have special meaning for many of non-SELECTcommands) */
   SELECT_LEX *select_lex= &lex->select_lex;
-  /* first table of first SELECT_LEX */
-  TABLE_LIST *first_table= select_lex->table_list.first;
   /* list of all tables in query */
   TABLE_LIST *all_tables;
-  /* most outer SELECT_LEX_UNIT of query */
-  SELECT_LEX_UNIT *unit= &lex->unit;
-#ifdef HAVE_REPLICATION
-  /* have table map for update for multi-update statement (BUG#37051) */
-  bool have_table_map_for_update= FALSE;
-  /* */
-  Rpl_filter *rpl_filter;
-#endif
   DBUG_ENTER("mysql_check_command");
 
 #ifdef WITH_PARTITION_STORAGE_ENGINE
@@ -2410,7 +2544,10 @@ mysql_check_command(THD *thd)
 
   case SQLCOM_CREATE_TABLE:
   {
-    if (mysql_check_create_table(thd) == FALSE)
+      if (!mysql_check_create_table(thd)) {
+        my_ok(thd);
+      }
+
       break;
   }
   case SQLCOM_SET_OPTION:
@@ -2437,7 +2574,7 @@ mysql_check_command(THD *thd)
   }
   default:
   {
-    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "embedded server");
+    my_error(ER_SQL_CHECK_NOT_SUPPORT, MYF(0));
     break;
   }
   } //switch
