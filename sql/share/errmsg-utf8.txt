@@ -7154,3 +7154,5 @@ ER_SQL_CHECK_CREATE_TABLE_COLUMN_DUPLICATE
 	eng "Table '%s' has more than one column '%s'."
 ER_SQL_CHECK_NOT_SUPPORT
 	eng "This version of SQL CHECK doesn't yet support this type statement."
+ER_SQL_CHECK_CREATE_TABLE_NO_COMMENT
+	eng "Table '%s' has no comment."

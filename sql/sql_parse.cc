@@ -2373,7 +2373,13 @@ bool mysql_check_create_table(THD *thd)
     return TRUE;
   }
 
-  //TODO TABLE COMMENT
+  /* check table comment */
+  if (!(create_info.used_fields & HA_CREATE_USED_COMMENT))
+  {
+    my_error(ER_SQL_CHECK_CREATE_TABLE_NO_COMMENT, MYF(0),
+        create_table->table_name);
+    return TRUE;
+  }
 
   /* 8. check columns */
   Alter_info alter_info(lex->alter_info, thd->mem_root);
