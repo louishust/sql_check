@@ -2197,6 +2197,32 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
   List_iterator<Create_field> it(alter_info->create_list);
   List_iterator<Create_field> it2(alter_info->create_list);
   int		field_no;
+  Key *key;
+  List_iterator<Key> key_it(alter_info->key_list);
+  List_iterator<Key> key_it2(alter_info->key_list);
+  Key_part_spec *column;
+
+
+  /* if the field is defined as primary key, NOT NULL FLAG is implicit */
+  while ((key=key_it++))
+  {
+    List_iterator<Key_part_spec> cols(key->columns), cols2(key->columns);
+    if (key->type == Key::PRIMARY)
+    {
+      column= cols++;
+      while ((sql_field=it++) &&
+            my_strcasecmp(system_charset_info,
+            column->field_name.str,
+            sql_field->field_name)) ;
+      it.rewind();
+
+      if (sql_field)
+      {
+        sql_field->flags |= NOT_NULL_FLAG;
+      }
+    }
+  }
+
   for (field_no=0; (sql_field=it++) ; field_no++)
   {
     /* 1. check columns name length, should be <= 64 */
@@ -2208,6 +2234,8 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
     }
 
     /* 2. NULL CHECK */
+
+    
     if (!(sql_field->flags & NOT_NULL_FLAG))
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_NULLABLE, MYF(0),
@@ -2262,7 +2290,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
       return TRUE;
     }
 
-    //TODO check duplicate columns
+    /* 7. check duplicate columns */
     while ((dup_field= it2++))
     {
       if (dup_field == sql_field)
@@ -2279,11 +2307,150 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
     it2.rewind();
   }
 
-
-  //TODO disable foreign key
-  //
   return FALSE;
 }
+
+/**
+  Check table keys
+
+  @param thd    Thread handle
+
+  @retval
+    FALSE       OK
+  @retval
+    TRUE        Error
+*/
+bool mysql_check_create_table_keys(TABLE_LIST* create_table,
+                                   Alter_info* alter_info)
+{
+  Key *key;
+  List_iterator<Create_field> it(alter_info->create_list);
+  List_iterator<Create_field> it2(alter_info->create_list);
+  List_iterator<Key> key_it(alter_info->key_list);
+  List_iterator<Key> key_it2(alter_info->key_list);
+  uint n_key= 0;
+  bool has_primary= FALSE;
+  while ((key=key_it++))
+  {
+    /* check for primary key */
+    if (key->type == Key::PRIMARY)
+    {
+      if (has_primary)
+      {
+        my_error(ER_SQL_CHECK_CREATE_TABLE_MUL_PK, MYF(0),
+            create_table->table_name);
+        return TRUE;
+      }
+      else
+      {
+        has_primary = TRUE;
+      }
+    }
+
+    /* unique key must start with uniq */
+    if (key->type == Key::UNIQUE)
+    {
+      if (key->name.str != NULL && strncmp(key->name.str, "uniq_", 5))
+      {
+        my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_UNIQ_KEY, MYF(0),
+            create_table->table_name, key->name.str);
+        return TRUE;
+      }
+    }
+
+    /* multiple normal index must start with idx */
+    if (key->type == Key::MULTIPLE)
+    {
+      if (key->name.str != NULL && strncmp(key->name.str, "idx_", 4))
+      {
+        my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_MUL_KEY, MYF(0),
+            create_table->table_name, key->name.str);
+        return TRUE;
+      }
+    }
+
+    /* do not support special index type such as spatial, fulltext */
+    if (key->type != Key::PRIMARY && key->type != Key::UNIQUE &&
+        key->type != Key::MULTIPLE)
+    {
+      my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_INDEX_TYPE, MYF(0),
+          create_table->table_name);
+      return TRUE;
+    }
+
+    {
+      List_iterator<Key_part_spec> cols(key->columns), cols2(key->columns);
+      Key_part_spec *column;
+      uint key_length=0;
+      Create_field *sql_field;
+      for (uint column_nr=0 ; (column=cols++) ; column_nr++)
+      {
+        uint length;
+        Key_part_spec *dup_column;
+
+        it.rewind();
+        while ((sql_field=it++) &&
+            my_strcasecmp(system_charset_info,
+              column->field_name.str,
+              sql_field->field_name)) ;
+        if (!sql_field)
+        {
+          my_error(ER_KEY_COLUMN_DOES_NOT_EXITS, MYF(0), column->field_name.str);
+          return (TRUE);
+        }
+
+        while ((dup_column= cols2++) != column)
+        {
+          if (!my_strcasecmp(system_charset_info,
+                column->field_name.str, dup_column->field_name.str))
+          {
+            my_printf_error(ER_DUP_FIELDNAME,
+                ER(ER_DUP_FIELDNAME),MYF(0),
+                column->field_name.str);
+            return (TRUE);
+          }
+        }
+        cols2.rewind();
+        if (!sql_field->stored_in_db)
+        {
+          /* Key fields must always be physically stored. */
+          my_error(ER_KEY_BASED_ON_GENERATED_VIRTUAL_COLUMN, MYF(0));
+          return (TRUE);
+        }
+        length= sql_field->key_length;
+        key_length+=length;
+        if (key_length > MAX_KEY_LENGTH)
+        {
+          my_error(ER_TOO_LONG_KEY,MYF(0),MAX_KEY_LENGTH);
+          return (TRUE);
+        }
+      }
+    }
+
+
+    n_key++;
+    if (n_key > 5)
+    {
+      my_error(ER_SQL_CHECK_CREATE_TABLE_TOO_MANY_KEYS, MYF(0),
+          create_table->table_name);
+      return TRUE;
+    }
+
+    //TODO add duplicate key check index(c1,c2), index(c1)
+    //TODO duplicate index name check
+
+  }
+
+  if (!has_primary)
+  {
+    my_error(ER_SQL_CHECK_CREATE_TABLE_WITHOUT_PK, MYF(0),
+        create_table->table_name);
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
 
 /**
   Check  create table
@@ -2384,6 +2551,9 @@ bool mysql_check_create_table(THD *thd)
   /* 8. check columns */
   Alter_info alter_info(lex->alter_info, thd->mem_root);
   if (mysql_check_create_table_columns(create_table, &alter_info))
+    return TRUE;
+
+  if (mysql_check_create_table_keys(create_table, &alter_info))
     return TRUE;
 
   return FALSE;

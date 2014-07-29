@@ -7156,3 +7156,15 @@ ER_SQL_CHECK_NOT_SUPPORT
 	eng "This version of SQL CHECK doesn't yet support this type statement."
 ER_SQL_CHECK_CREATE_TABLE_NO_COMMENT
 	eng "Table '%s' has no comment."
+ER_SQL_CHECK_CREATE_TABLE_WRONG_INDEX_TYPE
+	eng "Table '%s' with unsupported index type (FullText? Spatial? Foreig Key?)."
+ER_SQL_CHECK_CREATE_TABLE_MUL_PK
+	eng "Table '%s' with more than one Primary Key."
+ER_SQL_CHECK_CREATE_TABLE_TOO_MANY_KEYS
+	eng "Table '%s' with more than five Keys."
+ER_SQL_CHECK_CREATE_TABLE_WRONG_UNIQ_KEY
+	eng "Table '%s' unique key '%s' name must start with 'uniq_'."
+ER_SQL_CHECK_CREATE_TABLE_WRONG_MUL_KEY
+	eng "Table '%s' key '%s' name must start with 'idx_'."
+ER_SQL_CHECK_CREATE_TABLE_WITHOUT_PK
+	eng "Table '%s' not define Primary key."

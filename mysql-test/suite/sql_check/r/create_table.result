@@ -29,6 +29,7 @@ ERROR HY000: Table 'tt's column 'cc' has no comment.
 CREATE TABLE tt(CC INT NOT NULL COMMENT 'cc') ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
 ERROR HY000: Table 'tt's column 'CC' name must be [_a-z].
 CREATE TABLE tt(c_z INT NOT NULL COMMENT 'cc') ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR HY000: Table 'tt' not define Primary key.
 CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', c1 VARCHAR(20) NOT NULL COMMENT 'c2')
 ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
 ERROR HY000: Table 'tt' has more than one column 'c1'.
@@ -36,4 +37,21 @@ CREATE TABLE tt(c1 ENUM('MALE','FEMALE') NOT NULL COMMENT 'c1') ENGINE=INNODB DE
 ERROR HY000: Table 'tt's column 'c1' type can not be ENUM or SET.
 CREATE TABLE tt(c1 SET('MALE','FEMALE') NOT NULL COMMENT 'c1') ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
 ERROR HY000: Table 'tt's column 'c1' type can not be ENUM or SET.
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', index a(c1)) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR HY000: Table 'tt' key 'a' name must start with 'idx_'.
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', unique a(c1)) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR HY000: Table 'tt' unique key 'a' name must start with 'uniq_'.
+CREATE TABLE tt(c1 INT NOT NULL PRIMARY KEY COMMENT 'c1', c2 INT NOT NULL PRIMARY KEY COMMENT 'c2') ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR HY000: Table 'tt' with more than one Primary Key.
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', unique uniq_xx(cc)) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR 42000: Key column 'cc' doesn't exist in table
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', index idx_xx(cc)) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR 42000: Key column 'cc' doesn't exist in table
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', primary key(cc)) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR 42000: Key column 'cc' doesn't exist in table
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', index idx_xx(c1, c1)) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR 42S21: Duplicate column name 'c1'
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1', index idx_1(c1), index idx_1(c1), index idx_1(c1), index idx_1(c1), index idx_1(c1), index idx_1(c1)) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+ERROR HY000: Table 'tt' with more than five Keys.
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1' primary key) ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
 SET SQL_CHECK=0;
