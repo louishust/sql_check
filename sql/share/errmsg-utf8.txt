@@ -7168,3 +7168,7 @@ ER_SQL_CHECK_CREATE_TABLE_WRONG_MUL_KEY
 	eng "Table '%s' key '%s' name must start with 'idx_'."
 ER_SQL_CHECK_CREATE_TABLE_WITHOUT_PK
 	eng "Table '%s' not define Primary key."
+ER_SQL_CHECK_UPDATE_WITHOUT_WHERE
+	eng "Update table '%s' without WHERE condition."
+ER_SQL_CHECK_UPDATE_WITH_AND_EXPR
+	eng "Update table '%s' SET with AND expression."

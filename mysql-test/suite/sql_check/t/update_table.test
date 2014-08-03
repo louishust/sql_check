@@ -1,0 +1,18 @@
+# This test is for create table check
+
+connect (con1,localhost,root,,"");
+set sql_check=1;
+
+# CREATE TABLE tt
+CREATE TABLE tt(c1 INT NOT NULL COMMENT 'c1' primary key, c2 INT NOT NULL COMMENT 'c2')
+ENGINE=INNODB DEFAULT CHARSET=UTF8 COMMENT 'table tt';
+
+# UPDATE WITHOUT WHERE
+--error 2022
+UPDATE t1 set c1 = 4;
+
+# UPDATE WITH AND
+--error 2023
+UPDATE t1 SET c1 = 4 AND c2 = 5 WHERE c1=3;
+
+SET SQL_CHECK=0;

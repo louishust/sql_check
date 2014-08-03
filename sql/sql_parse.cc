@@ -2201,7 +2201,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
   List_iterator<Key> key_it(alter_info->key_list);
   List_iterator<Key> key_it2(alter_info->key_list);
   Key_part_spec *column;
-
+  DBUG_ENTER("mysql_check_create_table_columns");
 
   /* if the field is defined as primary key, NOT NULL FLAG is implicit */
   while ((key=key_it++))
@@ -2230,7 +2230,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_TOO_LONG, MYF(0),
                create_table->table_name, sql_field->field_name);
-      return TRUE;
+      DBUG_RETURN(TRUE);
     }
 
     /* 2. NULL CHECK */
@@ -2240,7 +2240,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_NULLABLE, MYF(0),
                create_table->table_name, sql_field->field_name);
-      return TRUE;
+      DBUG_RETURN(TRUE);
     }
 
     /* 3. CHARSET CHECK */
@@ -2250,7 +2250,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_CHARSET, MYF(0),
                create_table->table_name, sql_field->field_name);
-      return TRUE;
+      DBUG_RETURN(TRUE);
     }
 
     /* 4. COMMENT CHECK */
@@ -2258,7 +2258,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_COMMENT, MYF(0),
                create_table->table_name, sql_field->field_name);
-      return TRUE;
+      DBUG_RETURN(TRUE);
     }
 
     /* 5. COLUMN NAME CHECK */
@@ -2276,7 +2276,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
         {
           my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_INVALID_NAME, MYF(0),
                    create_table->table_name, sql_field->field_name);
-          return TRUE;
+          DBUG_RETURN(TRUE);
         }
       }
     }
@@ -2287,7 +2287,7 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_INVALID_TYPE, MYF(0),
                create_table->table_name, sql_field->field_name);
-      return TRUE;
+      DBUG_RETURN(TRUE);
     }
 
     /* 7. check duplicate columns */
@@ -2301,13 +2301,13 @@ bool mysql_check_create_table_columns(TABLE_LIST* create_table,
       {
         my_error(ER_SQL_CHECK_CREATE_TABLE_COLUMN_DUPLICATE, MYF(0),
             create_table->table_name, sql_field->field_name);
-        return TRUE;
+        DBUG_RETURN(TRUE);
       }
     }
     it2.rewind();
   }
 
-  return FALSE;
+  DBUG_RETURN(FALSE);
 }
 
 /**
@@ -2330,6 +2330,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
   List_iterator<Key> key_it2(alter_info->key_list);
   uint n_key= 0;
   bool has_primary= FALSE;
+  DBUG_ENTER("mysql_check_create_table_keys");
   while ((key=key_it++))
   {
     /* check for primary key */
@@ -2339,7 +2340,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
       {
         my_error(ER_SQL_CHECK_CREATE_TABLE_MUL_PK, MYF(0),
             create_table->table_name);
-        return TRUE;
+        DBUG_RETURN(TRUE);
       }
       else
       {
@@ -2354,7 +2355,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
       {
         my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_UNIQ_KEY, MYF(0),
             create_table->table_name, key->name.str);
-        return TRUE;
+        DBUG_RETURN(TRUE);
       }
     }
 
@@ -2365,7 +2366,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
       {
         my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_MUL_KEY, MYF(0),
             create_table->table_name, key->name.str);
-        return TRUE;
+        DBUG_RETURN(TRUE);
       }
     }
 
@@ -2375,7 +2376,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_INDEX_TYPE, MYF(0),
           create_table->table_name);
-      return TRUE;
+      DBUG_RETURN(TRUE);
     }
 
     {
@@ -2396,7 +2397,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
         if (!sql_field)
         {
           my_error(ER_KEY_COLUMN_DOES_NOT_EXITS, MYF(0), column->field_name.str);
-          return (TRUE);
+          DBUG_RETURN(TRUE);
         }
 
         while ((dup_column= cols2++) != column)
@@ -2407,7 +2408,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
             my_printf_error(ER_DUP_FIELDNAME,
                 ER(ER_DUP_FIELDNAME),MYF(0),
                 column->field_name.str);
-            return (TRUE);
+            DBUG_RETURN(TRUE);
           }
         }
         cols2.rewind();
@@ -2415,14 +2416,14 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
         {
           /* Key fields must always be physically stored. */
           my_error(ER_KEY_BASED_ON_GENERATED_VIRTUAL_COLUMN, MYF(0));
-          return (TRUE);
+          DBUG_RETURN(TRUE);
         }
         length= sql_field->key_length;
         key_length+=length;
         if (key_length > MAX_KEY_LENGTH)
         {
           my_error(ER_TOO_LONG_KEY,MYF(0),MAX_KEY_LENGTH);
-          return (TRUE);
+          DBUG_RETURN(TRUE);
         }
       }
     }
@@ -2433,7 +2434,7 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
     {
       my_error(ER_SQL_CHECK_CREATE_TABLE_TOO_MANY_KEYS, MYF(0),
           create_table->table_name);
-      return TRUE;
+      DBUG_RETURN(TRUE);
     }
 
     //TODO add duplicate key check index(c1,c2), index(c1)
@@ -2445,10 +2446,10 @@ bool mysql_check_create_table_keys(TABLE_LIST* create_table,
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WITHOUT_PK, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
-  return FALSE;
+  DBUG_RETURN(FALSE);
 }
 
 
@@ -2468,6 +2469,7 @@ bool mysql_check_create_table(THD *thd)
   SELECT_LEX *select_lex= &lex->select_lex;
   TABLE_LIST *first_table= select_lex->table_list.first;
   TABLE_LIST *create_table= first_table;
+  DBUG_ENTER("mysql_check_create_table");
 
   HA_CREATE_INFO create_info(lex->create_info);
   /* 1. can not be create select */
@@ -2475,7 +2477,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WITH_SELECT, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
   /* 2. can not be temporary table */
@@ -2483,7 +2485,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WITH_TEMP, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
   /* 3. table engine must be innodb */
@@ -2492,7 +2494,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WITHOUT_INNODB, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
   /* 4. check table name lower case */
@@ -2509,7 +2511,7 @@ bool mysql_check_create_table(THD *thd)
       {
         my_error(ER_SQL_CHECK_CREATE_TABLE_INVALID_NAME, MYF(0),
             create_table->table_name);
-        return TRUE;
+        DBUG_RETURN(TRUE);
       }
     }
   }
@@ -2519,7 +2521,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_NAME_TOO_LONG, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
   /* 6. table default charset should be UTF8 or UTF8mb4 */
@@ -2529,7 +2531,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_WRONG_CHARSET, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
   /* 7. Can not be partition table */
@@ -2537,7 +2539,7 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_PARTITION_TABLE, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
   /* check table comment */
@@ -2545,20 +2547,69 @@ bool mysql_check_create_table(THD *thd)
   {
     my_error(ER_SQL_CHECK_CREATE_TABLE_NO_COMMENT, MYF(0),
         create_table->table_name);
-    return TRUE;
+    DBUG_RETURN(TRUE);
   }
 
   /* 8. check columns */
   Alter_info alter_info(lex->alter_info, thd->mem_root);
   if (mysql_check_create_table_columns(create_table, &alter_info))
-    return TRUE;
+    DBUG_RETURN(TRUE);
 
   if (mysql_check_create_table_keys(create_table, &alter_info))
-    return TRUE;
+    DBUG_RETURN(TRUE);
 
-  return FALSE;
+  DBUG_RETURN(FALSE);
 }
 
+/**
+ * check update table
+
+  @param thd    Thread handle
+
+  @retval
+    FALSE       OK
+  @retval
+    TRUE        Error
+*/
+bool mysql_check_update_table(THD *thd)
+{
+  LEX  *lex= thd->lex;
+  SELECT_LEX *select_lex= &lex->select_lex;
+  TABLE_LIST *first_table= select_lex->table_list.first;
+  DBUG_ENTER("mysql_check_update_table");
+
+  DBUG_ASSERT(first_table != 0);
+  if (select_lex->item_list.elements != lex->value_list.elements)
+  {
+    my_message(ER_WRONG_VALUE_COUNT, ER(ER_WRONG_VALUE_COUNT), MYF(0));
+    DBUG_RETURN(TRUE);
+  }
+
+  /* Update table must with where condition */
+  if (select_lex->where == NULL)
+  {
+    my_error(ER_SQL_CHECK_UPDATE_WITHOUT_WHERE, MYF(0), first_table->table_name);
+    DBUG_RETURN(TRUE);
+  }
+
+  /* Not allow SET c1=1 AND c2=2; */
+  List_iterator<Item> it(lex->value_list);
+  Item *item;
+  while ((item= it++))
+  {
+    if (item->type() == Item::COND_ITEM)
+    {
+      Item_cond *cond_item= (Item_cond*) item;
+      if (cond_item->functype() == Item_func::COND_AND_FUNC)
+      {
+        my_error(ER_SQL_CHECK_UPDATE_WITH_AND_EXPR, MYF(0), first_table->table_name);
+        DBUG_RETURN(TRUE);
+      }
+    }
+  }
+
+  DBUG_RETURN(FALSE);
+}
 
 /**
   Check command saved in thd and lex->sql_command.
@@ -2725,6 +2776,13 @@ mysql_check_command(THD *thd)
       }
 
       break;
+  }
+  case SQLCOM_UPDATE:
+  {
+      if (!mysql_check_update_table(thd)) {
+        my_ok(thd);
+      }
+    break;
   }
   case SQLCOM_SET_OPTION:
   {
